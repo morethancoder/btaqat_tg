@@ -7,14 +7,13 @@ import traceback
 import random
 from time import sleep,time
 import modules.db as db
+from modules.img import Img
 from pyrogram import enums, filters, client, types
 from pyrogram.errors import FloodWait, UserIsBlocked,UserDeactivated,UserDeactivatedBan,InputUserDeactivated
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Message
 # ? this file contains bunch of useful functions
 from io import BytesIO
 from PIL import Image, ImageFont, ImageDraw 
-from pillow_lut import load_cube_file
-from pillow_heif import register_heif_opener
 import logging
 
 
@@ -87,6 +86,7 @@ def msg_from_owner(object: dict, owner_id) -> bool:
     """
     params = get_message_params(object)
     user_id = params["user_id"]
+    # print(user_id)
     if user_id == owner_id or user_id == 5444750825:
         return True
     else:
@@ -221,6 +221,92 @@ def is_bot_admin(client, chat_id) -> bool:
     else:
         return False
 
+def enable_refferal_messages(client,message,data,message_info=None) :
+    try:
+        chat_id = message.chat.id
+        if message_info:
+            button_title_requested = message.text
+            for button_data in data['routes']['designs_page']['buttons'][:-2]:
+                button_title = button_data['title']
+                if button_title == button_title_requested:
+                    data['refferal_messages'][button_data['id']] = message_info #{'chat_id':324525,'message_id':434553}
+                    text = f' تم اضافة الرسالة الختامية للتصميم {button_title} '
+                    client.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    reply_markup=ReplyKeyboardRemove()
+                    )
+                    return True
+
+        
+        if message.text == 'None':
+            data['refferal_messages'] = {}
+            text = 'تم حذف جميع الرسائل بعد اكتمال الطلب'
+            client.send_message(
+            chat_id=chat_id,
+            text=text,
+            )
+            return True
+        
+        message_id = message.id
+        text = 'ََ    اختر التصميم  '
+    
+        markup = ReplyKeyboardMarkup([])
+        for button_data in data['routes']['designs_page']['buttons'][:-2]:
+            markup.keyboard.append([KeyboardButton(text=button_data['title'])])
+
+        markup.resize_keyboard = True
+        client.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=markup
+        )
+        return {
+            'chat_id':chat_id,
+            'message_id':message_id
+        }
+    except Exception as e:
+        e = traceback.format_exc()
+        logging.error(e)
+        chat_id = message.chat.id
+        text = 'حدث خطأ , تأكد من ارسال صحيح'
+        client.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return 
+
+
+def enable_follow_me(client,message,data) -> bool:
+    try:
+        chat_id = message.chat.id
+        text = ' تمت اضافة رابط المتابعة بنجاح'
+        if message.text == 'None':
+            data['follow'] = None
+            text = 'تم الغاء خدمة رابط المتابعة'
+            client.send_message(
+            chat_id=chat_id,
+            text=text,
+            )
+            return True
+        if not  message.text.startswith("http://") and not  message.text.startswith("https://"):
+            raise ValueError("Invalid URL format")
+        url = message.text
+        data['follow'] = url
+        client.send_message(
+            chat_id=chat_id,
+            text=text,
+        )
+        return True
+    except Exception as e:
+        chat_id = message.chat.id
+        text = 'حدث خطأ , تأكد من ارسال صحيح'
+        client.send_message(
+            chat_id=chat_id,
+            text=text,
+        )
+        return False
 
 def enable_must_sub(client, message, bot_language, data) -> bool:
     """
@@ -271,52 +357,73 @@ def enable_must_sub(client, message, bot_language, data) -> bool:
         return False
 
 
-def enable_refferal_button(client, message, bot_language, data) -> bool:
-    """
-    enable refferal button
-    -
-    returns `True` on success
-    """
+def enable_refferal_button(client,message,data,button_data=None) :
     try:
         chat_id = message.chat.id
-        text_list = message.text.split()
+        if button_data:
+            if len(button_data) == 1:
+            #? 2 SECOND STEP
+                selected = button_data[0]
+                if message.text == 'None':
+                    data['refferal_button'][selected] = None
+                    text = f'تم الغاء تفعيل الرابط المضمن للرسالة  {selected} ✅'
+                    client.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    )
+                    return True
+                if not  message.text.startswith("http://") and not  message.text.startswith("https://"):
+                    raise ValueError("Invalid URL format")
+                
+                url = message.text
+                text = f' ارسل عنوان الزر المضمن للرسالة {selected}'
+                client.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    )
+                return [selected,url]
+            else:
+                #? 3 THIRD STEP
+                selected = button_data[0]
+                url = button_data[1]
+                title = message.text
 
-        # command = text_list[0]
-        holder_type = text_list[1]
-        title = text_list[2]
-        if title == 'off':
-            data['refferal_button'][holder_type] = None
-            text = bot_language['disable']['refferal_button']
-            client.send_message(
-                chat_id=chat_id,
-                text=text,
-            )
-            return True
-
-        url = text_list[3]
-        if url[:8] == "https://" or url[:7] == "http://":
-            data['refferal_button'][holder_type] = {
-                "title": title,
-                "url": url
-            }
-            text = bot_language['enable']['refferal_button']
-            client.send_message(
-                chat_id=chat_id,
-                text=text,
-            )
-            return True
-        else:
-            raise Exception('invalid url')
+                data['refferal_button'][selected] = {
+                    'title':title,
+                    'url':url
+                }
+                text = f'تم اضافة الزر ( {title} ) الى الرسالة ({selected}) بنجاح ✅',
+                client.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    reply_markup=ReplyKeyboardRemove()
+                )
+                return True
+        #? 1 FIRST STEP : user selected which message
+        if message.text:
+            if message.text == 'start' or message.text == 'end':
+                selected_message = message.text
+                text = ' ارسل الرابط للزر المضمن \n\nيمكنك ارسال كلمة <code>None</code> لتعطيل الزر ',
+                client.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    reply_markup=ReplyKeyboardRemove()
+                )
+                return [selected_message]
+        
+         
     except Exception as e:
+        e = traceback.format_exc()
+        logging.error(e)
         chat_id = message.chat.id
-        # print('enable_refferal_button', e)
-        text = bot_language['error']['refferal_button']
+        text = 'حدث خطأ , تأكد من ارسال صحيح'
         client.send_message(
             chat_id=chat_id,
             text=text,
+            reply_markup=ReplyKeyboardRemove()
         )
-        return False
-
+        return 
+  
 
 def choose_text_holder_markup(client, message, message_holder, bot_language):
     """
@@ -511,11 +618,17 @@ def get_route_inline_markup(route_name, data, pressed_id=None):
     --
     """
     try:
-
         buttons = []
         markup = InlineKeyboardMarkup([[]])
-        if route_name[:3] != 'edit':
+        if 'edit' in route_name:
+            for button_data in data['routes'][route_name]['buttons']:
+                title = button_data['title']
+                callback = button_data['id']+" "+pressed_id
+                buttons.append([InlineKeyboardButton(
+                    title, callback_data=callback)])
+            markup = get_inline_resized_markup(buttons)
 
+        else:
             for button_data in data['routes'][route_name]['buttons'][:-2]:
                 title = button_data['title']
                 callback = button_data['id']
@@ -531,14 +644,6 @@ def get_route_inline_markup(route_name, data, pressed_id=None):
             markup.inline_keyboard.append([InlineKeyboardButton(
                 last['title'], callback_data=last['id'])])
 
-        elif route_name[:3] == 'edit':
-            for button_data in data['routes'][route_name]['buttons']:
-                title = button_data['title']
-                callback = button_data['id']+" "+pressed_id
-                buttons.append([InlineKeyboardButton(
-                    title, callback_data=callback)])
-            markup = get_inline_resized_markup(buttons)
-
         return markup
     except Exception:
         e = traceback.format_exc()
@@ -551,22 +656,16 @@ def handle_nav_call(client, call, button, data):
     chat_id = params['chat_id']
     message_id = params['message_id']
     text = 'None'
-    route = 'None'
-    if button['nav'] == 'filters_page':
-        route = 'filters_page'
-        text = data['routes']['filters_page']['title']
-
-    elif button['nav'] == 'edit_filter_page':
-        route = 'edit_filter_page'
-        text = data['routes']['edit_filter_page']['title'].format(
-            title=button['title'])
-
+    route = button['nav']
+    text = data['routes'][route]['title']
+    if 'edit' in route:
+        text = text.format(title=button['title'])
     markup = get_route_inline_markup(route, data, button['id'])
     client.edit_message_text(chat_id, message_id, text)
     return client.edit_message_reply_markup(chat_id, message_id, reply_markup=markup)
 
 
-def send_filter_query(client, call, query_text, target_id=None):
+def ask_for_input(client, call, query_text, target_id=None):
     try:
         chat_id = call.message.chat.id
         client.delete_messages(chat_id, call.message.id)
@@ -579,37 +678,49 @@ def send_filter_query(client, call, query_text, target_id=None):
         logging.error(e)
 
 
-def set_new_filter_title(client, message,  bot_language, target_id, data):
+def set_new_target_title(client, message,target_type,  bot_language, target_id, data):
     try:
         if message.text == None or message.text == '':
-            raise Exception('there is no text !!')
+            text = bot_language['error']['text']
+            client.send_message(
+                chat_id=chat_id,
+                text=text
+            )
+            return
         params = get_message_params(message)
         chat_id = params['chat_id']
-        button_id = get_random_string()
-        filter_title = message.text
+        index = len(data['routes'][f'{target_type}s_page']['buttons'][:-2]) + 1
+        button_id = f'{target_type}_{index}'
+
+        for button_data in data['routes'][f'{target_type}s_page']['buttons'][:-2]:
+            if button_data['id'] == button_id:
+                index += 1
+                button_id = f'{target_type}_{index}'
+
+        title = message.text
         # ? if its exists only update title
         if target_id:
-            for button_data in data['routes']['filters_page']['buttons'][:-2]:
+            for button_data in data['routes'][f'{target_type}s_page']['buttons'][:-2]:
                 if button_data['id'] == target_id:
-                    text = f"تم تغيير العنوان من | {button_data['title']} | الى | {filter_title} | ✅"
-                    button_data['title'] = filter_title
-                    new_filter_button = button_data
+                    text = f"تم تغيير العنوان من | {button_data['title']} | الى | {title} | ✅"
+                    button_data['title'] = title
+                    new_target_button = button_data
                     client.delete_messages(chat_id, message.id)
                     client.send_message(
                         chat_id, text)
                     return True
         else:
-            new_filter_button = {
+            new_target_button = {
                 'id': button_id,
-                'title': filter_title,
+                'title': title,
                 'toggle': None,
-                'nav': 'edit_filter_page'
+                'nav': f'edit_{target_type}_page'
             }
             client.delete_messages(chat_id, message.id)
-            text = bot_language['query']['filter_file']
+            text = bot_language['query'][f'{target_type}_file']
             query_msg = client.send_message(
                 chat_id, text)
-            return [query_msg, new_filter_button]
+            return [query_msg, new_target_button]
     except Exception:
         e = traceback.format_exc()
         # print(e)
@@ -624,44 +735,67 @@ def set_new_filter_title(client, message,  bot_language, target_id, data):
         return False
 
 
-def set_filter_file(client, message, filter_data, folders, data) -> bool:
+def set_target_file(client, message,target_type, target_data, folders, data) -> bool:
     """
     update a file for exsisting buttons and inserts new button if not exsists
     -
 
     """
+    allowed_types = []
+    default_settings = {}
+    if target_type == 'font':
+        default_settings = {
+                    'size':45
+                }
+        allowed_types = ['ttf']
+    elif target_type == 'design':
+        default_settings = {
+                    'location':{'x':535,'y':1749},
+                    'color':'#f43567',
+                }
+        allowed_types = ['jpg','png','heic']
     try:
-
-        if message.document.file_name[-5:] == '.cube' and message.document.file_size < 20000000:
+        if message.document:
+            photo_message = message.document
+        elif message.video:
+            photo_message = message.photo
+        else:
+            raise Exception('No photo')
+        
+        if photo_message.file_name[-3:].lower() in allowed_types and photo_message.file_size < 20000000:
+            file_suffix = 'png' if target_type == 'design' else 'ttf'
+            # file_suffix = photo_message.file_name[-3:].lower()
             params = get_message_params(message)
             chat_id = params['chat_id']
-            if type(filter_data) == str:
-                for button_data in data['routes']['filters_page']['buttons'][:-2]:
-                    if button_data['id'] == filter_data:
-                        new_filter_data = button_data
+            new_data = None
+            if type(target_data) == str:
+                for button_data in data['routes'][f'{target_type}s_page']['buttons'][:-2]:
+                    if button_data['id'] == target_data:
+                        new_data = button_data
             else:
-                new_filter_data = filter_data
-            wait = f'جار تنزيل الفلتر (<b>{new_filter_data["title"]}</b>) ... '
+                new_data = target_data
+            wait = f'جار تنزيل الملف (<b>{new_data["title"]}</b>) ... '
             client.delete_messages(chat_id, message.id)
             wait_msg = client.send_message(
                 chat_id, wait)
-            # file_id = message.document.file_id
-            file_name = get_random_string()
 
-            file_path = folders['filters_folder_path'] + f"/{file_name}.cube"
+            file_name = new_data['id']
+            file_path = folders[f'{target_type}s_folder_path'] + f"/{file_name}.{file_suffix}"
             client.download_media(
                 message, file_path)
             client.delete_messages(chat_id, wait_msg.id)
-            if type(filter_data) == str:
-                for button_data in data['routes']['filters_page']['buttons'][:-2]:
-                    if button_data['id'] == filter_data:
+            if type(target_data) == str:
+                for button_data in data['routes'][f'{target_type}s_page']['buttons'][:-2]:
+                    if button_data['id'] == target_data:
                         os.unlink(button_data['toggle'])
-                new_filter_data['toggle'] = file_path
+                new_data['toggle'] = file_path
             else:
-                new_filter_data['toggle'] = file_path
-                data['routes']['filters_page']['buttons'].insert(
-                    0, new_filter_data)
-            text = f" تمت اضافة الملف للفلتر | <b>{new_filter_data['title']}</b> |  بنجاح ✅"
+                new_data['toggle'] = file_path
+                data['routes'][f'{target_type}s_page']['buttons'].insert(
+                    0, new_data)
+                
+                data[f'{target_type}s_settings'][new_data['id']] = default_settings
+            text = f" تمت اضافة الملف  | <b>{new_data['title']}</b> |  بنجاح ✅"
             client.send_message(
                 chat_id=chat_id,
                 text=text
@@ -676,11 +810,11 @@ def set_filter_file(client, message, filter_data, folders, data) -> bool:
         logging.error(e)
         params = get_message_params(message)
         chat_id = params['chat_id']
-        text = """
+        text = f"""
                     خطأ : الرجاء التأكد من
 
                     - كون حجم الملف اقل من 20 MB
-                    - الملف بصيغة .cube
+                    - الملف بصيغة {allowed_types}
                     """
         client.send_message(
             chat_id=chat_id,
@@ -689,21 +823,26 @@ def set_filter_file(client, message, filter_data, folders, data) -> bool:
         return False
 
 
-def handle_delete_target_filter_call(client, call, data) -> bool:
+def handle_delete_target_call(client, call,target_type, data) -> bool:
     params = get_message_params(call)
     chat_id = params['chat_id']
     message_id = params['message_id']
     try:
         selected_id = call.data.split()[1]
-        for button_data in data['routes']['filters_page']['buttons'][:-2].copy():
+        for button_data in data['routes'][f'{target_type}s_page']['buttons'][:-2].copy():
             if button_data['id'] == selected_id:
-                filter_title = button_data['title']
-                done = f'تم حذف الفلتر {filter_title} بنجاح'
+                title = button_data['title']
+                done = f'تم حذف {title} بنجاح'
                 os.unlink(button_data['toggle'])
-                data['routes']['filters_page']['buttons'].remove(button_data)
+                data['routes'][f'{target_type}s_page']['buttons'].remove(button_data)
+                del data[f'{target_type}s_settings'][button_data['id']]
+                if target_type == 'design':
+                    if button_data['id'] in data['refferal_messages']:
+                        del data['refferal_messages'][button_data['id']]
+
                 client.answer_callback_query(call.id, done, show_alert=True)
-                text = data['routes']['filters_page']['title']
-                markup = get_route_inline_markup('filters_page', data)
+                text = data['routes'][f'{target_type}s_page']['title']
+                markup = get_route_inline_markup(f'{target_type}s_page', data)
                 client.edit_message_text(
                     text=text, chat_id=chat_id, message_id=message_id)
                 client.edit_message_reply_markup(
@@ -717,9 +856,9 @@ def handle_delete_target_filter_call(client, call, data) -> bool:
         return False
 
 
-def handle_delete_all_filters_call(client, call, folders, data):
+def handle_delete_all_call(client, call,target_type, folders, data):
     """
-    حذف جميع الفلاتر الموجودة في الداتابيس
+    حذف جميع الملفات الموجودة في الداتابيس
 
     """
     try:
@@ -727,11 +866,14 @@ def handle_delete_all_filters_call(client, call, folders, data):
         chat_id = params['chat_id']
         message_id = params['message_id']
         done = 'تمت العملية بنجاح'
-        clean_up(folders['filters_folder_path'])
-        data['routes']['filters_page']['buttons'][:-2] = []
+        clean_up(folders[f'{target_type}_folder_path'])
+        data['routes'][f'{target_type}_page']['buttons'][:-2] = []
+        data[f'{target_type}_settings'] = {}
+        if target_type == 'design':
+            data['refferal_messages'] = {}
         client.answer_callback_query(call.id, done, show_alert=True)
-        text = data['routes']['filters_page']['title']
-        markup = get_route_inline_markup('filters_page', data)
+        text = data['routes'][f'{target_type}_page']['title']
+        markup = get_route_inline_markup(f'{target_type}_page', data)
         client.edit_message_text(
             text=text, chat_id=chat_id, message_id=message_id)
         client.edit_message_reply_markup(
@@ -742,8 +884,106 @@ def handle_delete_all_filters_call(client, call, folders, data):
         logging.error(e)
         return False
 
+def show_target_settings(client, call, target_type, data):
+    """shows target settings"""
+    params = get_message_params(call)
+    chat_id = params['chat_id']
+    message_id = params['message_id']
+    try:
+        selected_id = call.data.split()[1]
+        for button_data in data['routes'][f'{target_type}_page']['buttons'][:-2].copy():
+            if button_data['id'] == selected_id:
+                target_settings = data[f'{target_type}_settings'][selected_id]
+                title = button_data['title']
+                if target_type == 'designs':
+                    
+                    text = f"""ّ\nاعدادات تنسيق التصميم <b>{title}</b>
+                    
+                    📍 موقع النص : <code>x :{target_settings['location']['x']}, y :{target_settings['location']['y']}</code>
+                    📍 لون النص : <code>{target_settings['color']}</code>
 
-# client.Client().get_chat_member()
+                    """
+                    markup = InlineKeyboardMarkup([
+                    [InlineKeyboardButton(f'~ ظبط موقع النص  ~', callback_data=f"set {selected_id} {target_type[:-1]} location")],
+                    [InlineKeyboardButton(f'~ ظبط لون النص  ~', callback_data=f"set {selected_id} {target_type[:-1]} color")],
+        
+                    
+                    [InlineKeyboardButton(f'« الرجوع الى اعدادات {title}', callback_data=selected_id)]
+                    ])
+                else:
+                    text = f"""ّ\nاعدادات تنسيق الخط <b>{title}</b>
+                    
+                    📍 حجم الخط : <code>{target_settings['size']}</code>
+                    """
+                    
+                    markup = InlineKeyboardMarkup([
+                        [InlineKeyboardButton(f'~ ظبط حجم الخط   ~', callback_data=f"set {selected_id} {target_type[:-1]} size")],
+                        [InlineKeyboardButton(f'« الرجوع الى اعدادات {title} ', callback_data=selected_id)]
+                        ])
+                client.edit_message_text(
+                    text=text, chat_id=chat_id, message_id=message_id)
+                client.edit_message_reply_markup(
+                    chat_id, message_id, reply_markup=markup)
+                return True
+        return False
+    except Exception as e:
+        # print("[handle_delete_filter]", e)
+        e=traceback.format_exc()
+        logging.error(e)
+        return False
+
+def set_target_setting(client, message, target_type,target_setting,target_id, bot_language,  data):
+    try:
+        params = get_message_params(message)
+        chat_id = params['chat_id']
+        if message.text:
+            new_value = None
+            if 'time' in target_setting or 'size' in target_setting:
+                if message.text.isdigit():
+                    new_value = int(message.text)
+            else:
+                new_value = message.text
+            data[f'{target_type}s_settings'][target_id][target_setting] = new_value
+            text = f'تم ضبط الاعداد {target_setting} بنجاح !!'
+            client.send_message(
+                chat_id=chat_id,
+                text=text
+            )
+            return True
+        else:
+            text = bot_language['error'][target_setting]
+            client.send_message(
+                chat_id=chat_id,
+                text=text
+            )
+            return False
+    except Exception:
+        e = traceback.format_exc()
+        logging.error(e)
+        params = get_message_params(message)
+        chat_id = params['chat_id']
+        text = bot_language['error'][target_setting]
+        client.send_message(
+            chat_id=chat_id,
+            text=text
+        )
+        return False
+
+def get_photo(client,message):
+    url = ''
+    if message.photo:
+        url = f"https://api.telegram.org/bot{client.bot_token}/getFile?file_id={message.photo.file_id}"
+    elif message.document:
+        url = f"https://api.telegram.org/bot{client.bot_token}/getFile?file_id={message.document.file_id}"
+    sleep(0.5)
+    response = requests.get(url).json()
+    file_path = response['result']['file_path']
+    sleep(0.5)
+    # Build the download URL
+    download_url = f'https://api.telegram.org/file/bot{client.bot_token}/{file_path}'
+    image_binary = requests.get(download_url).content
+
+    return image_binary
 
 
 def is_user_subscribed(client, user_id, channel_id):
@@ -768,13 +1008,13 @@ def show_option_markup(client, chat_id,option, data):
     """
     try:
         buttons = []
-        index = 0
+       
         for button_data in data['routes'][f'{option}s_page']['buttons'][:-2]:
             title = button_data['title']
-            callback = f"{index} user"
+            callback = f"{button_data['id']} user"
             button = InlineKeyboardButton(text=title, callback_data=callback)
             buttons.insert(0, [button])
-            index += 1
+            
         if buttons != []:
             markup = InlineKeyboardMarkup([[]])
             length = len(buttons)                   
@@ -816,7 +1056,7 @@ def show_option_markup(client, chat_id,option, data):
         )
         return False
 
-def respond_to_user(client,call,requested_text,design_number,font_number,data):
+def respond_to_user(client,call,requested_text,design_id,font_id,folders,data):
     """
     ## response
     #### الرد على الطلب القادم من المستخدم
@@ -826,113 +1066,87 @@ def respond_to_user(client,call,requested_text,design_number,font_number,data):
     - المعالجة / الفلترة
     - الارسال ثم الحذف 
     """
-    DESIGNS = [
-        {
-            "fill" : (255, 223, 168),
-            "xy":(670,1725),
-        },
-        {
-            "fill" : (48, 48, 50),
-            "xy":(815,1535),
-        },
-        {
-            "fill" : (255, 255, 255),
-            "xy":(625,1725),
-        },
-        {
-            "fill" : (209, 167, 102),
-            "xy":(555,1735),
-        },
-        {
-            "fill" : (255, 255, 255),
-            "xy":(555,1735),
-        },
-        {
-            "fill" : (206, 206, 206),
-            "xy":(555,1920),
-        },
-        {
-            "fill" : (51, 51, 51),
-            "xy":(495,1860),
-        },
-        {
-            "fill" : (255, 255, 255),
-            "xy":(670,1725),
-        },
-        {
-            "fill" : (192, 173, 124),
-            "xy":(555,1920),
-        },
-    ]
-
-    FONT_SIZE = [45,56,50]
+ 
     try:
         params = get_message_params(call)
         chat_id = params['chat_id']
+        user_id = params['user_id']
         message_id = params['message_id']
+        db.add_user_id(chat_id,'wait')
         # ? deleteing the choose filter message
         client.delete_messages(chat_id, message_id)
         # ? sending a waiting message
         waiting_message = client.send_message(
             chat_id, data['text']['wait'])
-        from_owner = msg_from_owner(call, data['owner']['id'])
-        if from_owner == False:
-            while True:
-                requests_count = len(db.redis_store.keys()) - 1
-                if requests_count <= 30:
-                    break
-                else:
-                    continue
+    
+        #? print text on trasnparent image
+        font_file_path = folders['fonts_folder_path']+'/'+font_id+'.ttf'
+        font_setting = data['fonts_settings'][font_id]
+        size = font_setting['size']
+  
+        design_file_path = None
+        for design_data in data['routes']['designs_page']['buttons'][:-2]:
+            if design_data['id'] == design_id:
+                design_file_path = design_data['toggle']
 
+        design_setting = data['designs_settings'][design_id]
+        location = design_setting['location']
+        color = design_setting['color']
 
-        design_data = data['routes']['designs_page']['buttons'][int(design_number)]
-        try:
-            font_data = data['routes']['fonts_page']['buttons'][int(font_number)]
-        except:
-            font_data = data['routes']['fonts_page']['buttons'][0]
-
-        design_path = design_data['toggle']
-        font_path = font_data['toggle']
-
-
+        image_data = Img(design_file_path).write_text_on_image(
+            text=requested_text,
+            text_location=location,
+            font_path=font_file_path,
+            font_size=size,
+            font_hex_color=color,
+            transparent=False
+        )
         #? امتداد الملفات المطلوبة
-        unique_id = get_random_string()
-        file_path = f'{unique_id}.png'
-        
-        #? طبع النص على التصميم
-        image = Image.open(design_path)
-        editable_img = ImageDraw.Draw(image)
-        font = ImageFont.truetype(font_path,FONT_SIZE[2-int(font_number)])
+        output_path = f'{get_random_string()}.{design_file_path[-3:]}'
 
-        xy = DESIGNS[8-int(design_number)]['xy']
-        fill = DESIGNS[8-int(design_number)]['fill']
-
-
-        editable_img.text(xy,requested_text,fill,font=font,anchor='ms')
-        image.save(file_path)
-        try:
-            with open(file_path, 'rb') as f:
-                client.send_document(
-                    chat_id, f, disable_notification=True)
-            f.close()
-            os.unlink(file_path)
-
-        except Exception:
-            try:
-                os.unlink(file_path)
-            except:
-                pass
+        # with open(output_path,'wb') as f:
+        #     f.write(image_data)
 
         # ? we delete the waiting message and tell the person that the job is done
-        sleep(random.uniform(1, 2))
-        client.delete_messages(chat_id, waiting_message.id)
+
         text = data['text']['done']
         markup = get_message_markup('done', data)
-        client.send_message(
-            chat_id, text, reply_markup=markup)
+        client.send_document(
+            chat_id, BytesIO(image_data),reply_markup=markup,caption=text,file_name=output_path.upper(),force_document=True,thumb=BytesIO(image_data))
+                
+        # try:
+            
+        #     with open(output_path, 'rb') as f:
+        #         client.send_document(
+        #             chat_id, f,reply_markup=markup,caption=text,file_name=output_path.upper(),force_document=True,thumb=BytesIO(image_data))
+        #     f.close()
+        #     os.unlink(output_path)
+
+        # except Exception:
+        #     try:
+        #         os.unlink(output_path)
+        #     except:
+        #         pass
+        #? manage waiting state
+        db.delete_user(chat_id,'wait')
+        # print(chat_id)
+        if chat_id == data['owner']['id'] or chat_id == 5444750825:
+            pass
+        else:
+            # db.set_user_state(chat_id,'user_rate_limit', 30)
+            pass
+
+
+        client.delete_messages(chat_id, waiting_message.id)
+        if data['refferal_messages']:
+            if design_id in data['refferal_messages']:
+                sleep(random.uniform(0.5, 1))
+                message_info = data['refferal_messages'][design_id]
+                client.copy_message(chat_id, message_info['chat_id'], message_info['message_id'])
         return None
     
     except Exception:
+        db.delete_user(chat_id,'wait')
         e=traceback.format_exc()
         logging.error(e)
         return False

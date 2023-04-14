@@ -65,31 +65,33 @@ redis_store = Redis(host=DB_HOST, port=DB_PORT, db=DB_ID)
 #! SET
 # ? users set functions
 
-def add_user_id(id: int) -> bool:
+def add_user_id(id: int,list_id='users') -> bool:
     """
     add user id to database
     --
     - if user id exists return `False`
     - if not exists add it & return `True`
     """
-    if redis_store.sismember('users', id):
+    if redis_store.sismember(list_id, id):
         return False
     else:
-        redis_store.sadd('users', id)
+        redis_store.sadd(list_id, id)
         return True
 
+def get_set_items_count(list_id) -> int:
+    return redis_store.scard(list_id)
 
 def get_users_count() -> int:
     return redis_store.scard('users')
 
 
-def delete_user(id: int):
+def delete_user(id: int,list_id='users'):
     """
     delete user if exists in db
     --
     return `True` on success delete
     """
-    if redis_store.srem('users', id) == 1:
+    if redis_store.srem(list_id, id) == 1:
         return True
     else:
         return False
@@ -122,19 +124,22 @@ def get_users_list() -> list:
 # ? user state functions
 
 
-def set_user_state(id: int, state: str, expire=60):
+def set_user_state(id: int, state: str, expire=60,key=None):
     """
     set the state for a user in the database
     """
-    key = f"user:{id}:state"
+    if not key:
+        key = f"user:{id}:state"
     return redis_store.set(key, state, expire)
 
 
-def get_user_state(id: int):
+def get_user_state(id: int,key=None):
     """
     get the available user state
     """
-    key = f"user:{id}:state"
+    if not key:
+        key = f"user:{id}:state"
+
     result = redis_store.get(key)
     if result:
         state = result.decode()
@@ -143,11 +148,13 @@ def get_user_state(id: int):
         return result
 
 
-def delete_user_state(id: int) -> bool:
+def delete_user_state(id: int , key=None) -> bool:
     """
     Delete the state of a user from the database
     """
-    key = f"user:{id}:state"
+    if not key:
+        key = f"user:{id}:state"
+
     if redis_store.delete(key) == 1:
         return True
     else:
@@ -155,5 +162,11 @@ def delete_user_state(id: int) -> bool:
 
 
 if __name__ == "__main__":
+    # print(redis_store.keys())
+    # print(redis_store.flushdb())
     print('active users',get_users_count())
     print('active states',len(redis_store.keys()) - 1)
+    # for user in get_users_list():
+    #     print(get_user_state(user))
+    #     print(delete_user_state(user))
+
