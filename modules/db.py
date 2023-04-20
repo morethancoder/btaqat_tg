@@ -160,6 +160,13 @@ def delete_user_state(id: int , key=None) -> bool:
     else:
         return False
 
+def get_expire_time_in_seconds(chat_id):
+    key = f"user:{chat_id}:state"
+    ttl_seconds = redis_store.ttl(key)
+
+    return ttl_seconds
+
+
 
 if __name__ == "__main__":
     # print(redis_store.keys())

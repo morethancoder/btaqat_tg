@@ -43,7 +43,7 @@ limit_text ="""
 
 [ توجد هناك طلبات كثيرة ] 🤖 
 
-‏يرجى إرسال طلبك من جديد بعد 60 ثانية .
+‏يرجى إرسال طلبك من جديد بعد 30 ثانية .
 """
 
 
@@ -237,8 +237,19 @@ def after_new_message(client, message):
         user_status = db.get_user_state(chat_id,status)
         # print(user_state)
         if user_state:
-            if 'apply' in user_state or 'user_rate_limit' in user_state or 'requested_text' in user_state:
-                return client.send_message(chat_id, 'عذرا, عليك الانتظار قبل ارسال  طلب اخر\n\n اعد المحاولة لاحقاً')
+            if user_state == 'user_rate_limit':
+                remaining_seconds = db.get_expire_time_in_seconds(chat_id)
+                text = f"""
+⚠️ عذرًا عزيزي .. 
+
+[ توجد هناك طلبات كثيرة ] 🤖 
+
+‏يرجى إرسال طلبك من جديد بعد {remaining_seconds} ثانية .
+"""
+                return client.send_message(chat_id, text)
+            
+            if 'apply' in user_state  or 'requested_text' in user_state:
+                return client.send_message(chat_id, '⚠️ عذرًا عزيزي ..  \n [ عليك الانتظار قبل ارسال  طلب اخر ] 🤖\n\n اعد المحاولة لاحقاً')
             
         from_owner = tools.msg_from_owner(message, data['owner']['id'])
         if data['follow']:

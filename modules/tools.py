@@ -1104,7 +1104,7 @@ def respond_to_user(client,call,requested_text,design_id,data):
             transparent=False
         )
         #? امتداد الملفات المطلوبة
-        output_path = f'{get_random_string()}.{design_file_path[-3:]}'
+        output_path = f'{design_id}.{design_file_path[-3:]}'
 
         # with open(output_path,'wb') as f:
         #     f.write(image_data)
