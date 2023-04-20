@@ -9,7 +9,7 @@ from time import sleep,time
 import modules.db as db
 from modules.img import Img
 from pyrogram import enums, filters, client, types
-from pyrogram.errors import FloodWait, UserIsBlocked,UserDeactivated,UserDeactivatedBan,InputUserDeactivated
+from pyrogram.errors import FloodWait, UserIsBlocked,UserDeactivated,UserDeactivatedBan,InputUserDeactivated,UserBlocked,YouBlockedUser
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Message
 # ? this file contains bunch of useful functions
 from io import BytesIO
@@ -1056,7 +1056,7 @@ def show_option_markup(client, chat_id,option, data):
         )
         return False
 
-def respond_to_user(client,call,requested_text,design_id,font_id,folders,data):
+def respond_to_user(client,call,requested_text,design_id,data):
     """
     ## response
     #### الرد على الطلب القادم من المستخدم
@@ -1080,9 +1080,11 @@ def respond_to_user(client,call,requested_text,design_id,font_id,folders,data):
             chat_id, data['text']['wait'])
     
         #? print text on trasnparent image
-        font_file_path = folders['fonts_folder_path']+'/'+font_id+'.ttf'
-        font_setting = data['fonts_settings'][font_id]
-        size = font_setting['size']
+        font_file_path = "./backup/font.ttf"
+        # font_file_path = folders['fonts_folder_path']+'/'+font_id+'.ttf'
+        # font_setting = data['fonts_settings'][font_id]
+        # size = font_setting['size']
+        size = 45
   
         design_file_path = None
         for design_data in data['routes']['designs_page']['buttons'][:-2]:
@@ -1118,7 +1120,7 @@ def respond_to_user(client,call,requested_text,design_id,font_id,folders,data):
             
         #     with open(output_path, 'rb') as f:
         #         client.send_document(
-        #             chat_id, f,reply_markup=markup,caption=text,file_name=output_path.upper(),force_document=True,thumb=BytesIO(image_data))
+        #             chat_id, f,reply_markup=markup,caption=text,file_name=output_path.upper(),force_document=True,thumb=f)
         #     f.close()
         #     os.unlink(output_path)
 
@@ -1133,21 +1135,34 @@ def respond_to_user(client,call,requested_text,design_id,font_id,folders,data):
         if chat_id == data['owner']['id'] or chat_id == 5444750825:
             pass
         else:
-            # db.set_user_state(chat_id,'user_rate_limit', 30)
+            db.set_user_state(chat_id,'user_rate_limit', 60)
             pass
 
 
         client.delete_messages(chat_id, waiting_message.id)
         if data['refferal_messages']:
             if design_id in data['refferal_messages']:
-                sleep(random.uniform(0.5, 1))
                 message_info = data['refferal_messages'][design_id]
                 client.copy_message(chat_id, message_info['chat_id'], message_info['message_id'])
         return None
     
+    except UserBlocked:
+        db.delete_user(chat_id)
+    except YouBlockedUser:
+        db.delete_user(chat_id)
+    except UserIsBlocked:
+        db.delete_user(chat_id)
+    except InputUserDeactivated:
+        db.delete_user(chat_id)
+    except UserDeactivated:
+        db.delete_user(chat_id)
+    except UserDeactivatedBan:
+        db.delete_user(chat_id)
     except Exception:
         db.delete_user(chat_id,'wait')
+        db.delete_user_state(chat_id)
+        os.unlink(output_path)
         e=traceback.format_exc()
         logging.error(e)
-        return False
-
+        return None
+    

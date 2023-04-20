@@ -13,7 +13,7 @@ from modules.img import Img
 from pyrogram import Client, filters, enums, types
 from pyrogram.errors import FloodWait,UserIsBlocked,InputUserDeactivated,UserDeactivated,UserDeactivatedBan,MessageDeleteForbidden
 from dotenv import load_dotenv
-
+import multiprocessing
 
 logging.basicConfig(filename="pyrogramErrors.log", level=logging.WARNING,
                     format="%(asctime)s:%(levelname)s:%(message)s")
@@ -37,6 +37,14 @@ bot = Client('btaqat_tg', api_id=API_ID,
 bot.set_parse_mode(enums.ParseMode.HTML)
 # commands = tools.get_commands(setup.CONFIG_TEMPLATE['commands_data'])
 # bot.set_bot_commands(commands)
+                        
+limit_text ="""
+⚠️ عذرًا عزيزي .. 
+
+[ توجد هناك طلبات كثيرة ] 🤖 
+
+‏يرجى إرسال طلبك من جديد بعد 60 ثانية .
+"""
 
 
 @bot.on_message(filters.private & filters.command(['start', 'help', 'set','follow','refferal_messages','button', 'designs', 'fonts', 'broadcast', 'text',
@@ -229,7 +237,7 @@ def after_new_message(client, message):
         user_status = db.get_user_state(chat_id,status)
         # print(user_state)
         if user_state:
-            if 'apply' in user_state or 'user_rate_limit' in user_state or 'wait' in user_state:
+            if 'apply' in user_state or 'user_rate_limit' in user_state or 'requested_text' in user_state:
                 return client.send_message(chat_id, 'عذرا, عليك الانتظار قبل ارسال  طلب اخر\n\n اعد المحاولة لاحقاً')
             
         from_owner = tools.msg_from_owner(message, data['owner']['id'])
@@ -269,24 +277,30 @@ def after_new_message(client, message):
                                 'إشتراك ⚠️', url=channel_url)
                             markup = types.InlineKeyboardMarkup([[url_button]])
                             return client.send_message(chat_id, text, reply_markup=markup)
-                        
-                    
-                    requests_count = db.get_set_items_count('wait')
-                    if requests_count <= 20:
+
+                    if len(threading.enumerate()) <= 30:
                         pass
                     else:
-                        waiting_message = client.send_message(
-                        chat_id, data['text']['wait'])
-                        time.sleep(10)
-                        client.delete_messages(chat_id,waiting_message.id)
+                        client.send_message(
+                            chat_id, limit_text)
+                        db.redis_store.delete('wait')
+                        db.delete_user_state(channel_id)
                         return
+                    # requests_count = db.get_set_items_count('wait')
+                    # if requests_count <= 10:
+                    #     pass
+                    # else:
+                    #     client.send_message(
+                    #         chat_id, limit_text)
+                    #     db.redis_store.delete('wait')
+                    #     return
 
                 requested_text = message.text
                 
                 if tools.show_option_markup(
                     client, chat_id,'design', data):
                     db.set_user_state(
-                        chat_id, f'requested_text::{requested_text}', 40)
+                        chat_id, f'requested_text::{requested_text}', 30)
                 return
 
             elif  message.text and len(message.text) > 30 :
@@ -445,15 +459,26 @@ def on_call(client, call):
                         requested_text = user_state.split('::')[-1]
                         if user_state.split('::')[0] == 'requested_text':
                             client.delete_messages(chat_id, message_id)
-                            tools.show_option_markup(client,chat_id,'font',data)
-                            db.set_user_state(
-                                chat_id, f'apply::{option_id}::{requested_text}', 30)
-                            return
-                        if user_state.split('::')[0] == 'apply':
-                            design_id = user_state.split('::')[1]
-                            font_id = option_id
-                            threading.Thread(target=tools.respond_to_user,args=(client,call,requested_text,design_id,font_id,folders,data)).start()
-                            return
+
+                            # tools.show_option_markup(client,chat_id,'font',data)
+                            # db.set_user_state(
+                            #     chat_id, f'apply::{option_id}::{requested_text}', 30)
+                            # return
+                            # design_id = user_state.split('::')[1]
+                            # font_id = option_id
+
+                            # requests_count = db.get_set_items_count('wait')
+
+                           
+                            # logging.error(len(threading.enumerate()))
+                            threading.Thread(target=tools.respond_to_user,args=(bot,call,requested_text,option_id,data)).start()
+                            return client.answer_callback_query(call.id,'تم استقبال طلبك بنجاح',False)
+                            
+                        # if user_state.split('::')[0] == 'apply':
+                        #     design_id = user_state.split('::')[1]
+                        #     font_id = option_id
+                        #     threading.Thread(target=tools.respond_to_user,args=(bot,call,requested_text,design_id,font_id,folders,data)).start()
+                        #     return client.answer_callback_query(call.id,'تم استقبال طلبك بنجاح',False)
                             
                     else:
                         try:

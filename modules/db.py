@@ -166,7 +166,8 @@ if __name__ == "__main__":
     # print(redis_store.flushdb())
     print('active users',get_users_count())
     print('active states',len(redis_store.keys()) - 1)
-    # for user in get_users_list():
-    #     print(get_user_state(user))
-    #     print(delete_user_state(user))
+
+    for user in get_users_list():
+        print(get_user_state(user))
+        print(delete_user_state(user))
 
