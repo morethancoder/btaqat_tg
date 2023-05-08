@@ -8,7 +8,8 @@ import random
 from time import sleep,time
 import modules.db as db
 from modules.img import Img
-from pyrogram import enums, filters, client, types
+from pyrogram import enums, filters, client, types,errors
+from pyrogram.client import Client
 from pyrogram.errors import FloodWait, UserIsBlocked,UserDeactivated,UserDeactivatedBan,InputUserDeactivated,UserBlocked,YouBlockedUser
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, Message
 # ? this file contains bunch of useful functions
@@ -76,7 +77,7 @@ def get_commands(commands_data):
     return commands
 
 
-def msg_from_owner(object: dict, owner_id) -> bool:
+async def msg_from_owner(object: dict, owner_id) -> bool:
     """
     is message from owner
     --
@@ -93,7 +94,7 @@ def msg_from_owner(object: dict, owner_id) -> bool:
         return False
 
 
-def clean_up(folder: str):
+async def clean_up(folder: str):
     """
     حذف جميع البيانات داخل المجلد المعطى
     --
@@ -107,8 +108,7 @@ def clean_up(folder: str):
         except Exception as e:
             print('Failed to delete %s. Reason: %s' % (file_path, e))
 
-
-def download(urls: list, path: str, type: str, name=None) -> bool:
+async def download(urls: list, path: str, type: str, name=None) -> bool:
     """
     # download
     # تنزيل الملفات عن طريق الروابط
@@ -130,7 +130,7 @@ def download(urls: list, path: str, type: str, name=None) -> bool:
             if name:
                 file_name = name
 
-            file_data = requests.get(url, headers=headers).content
+            file_data = await requests.get(url, headers=headers).content
             with open(f'{path}/{file_name}.{type}', 'wb') as handler:
                 handler.write(file_data)
             sleep(timeout)
@@ -138,7 +138,6 @@ def download(urls: list, path: str, type: str, name=None) -> bool:
     except Exception as e:
         # print(f'[!] error downloading {e}')
         return False
-
 
 def get_message_markup(selected: str, data):
     """
@@ -162,7 +161,8 @@ def get_message_markup(selected: str, data):
         return None
 
 
-def change_ownership(client, message, bot_language, data) -> bool:
+
+async def change_ownership(client, message, bot_language, data) -> bool:
     """
     change bot ownership
     - returns `True` on success
@@ -188,7 +188,7 @@ def change_ownership(client, message, bot_language, data) -> bool:
                 "first_name": first_name,
                 "last_name": last_name
             }
-            client.send_message(
+            await client.send_message(
                 chat_id=chat_id,
                 text=text,
 
@@ -199,7 +199,7 @@ def change_ownership(client, message, bot_language, data) -> bool:
         chat_id = message.chat.id
         # print(e)
         text = bot_language['error']['set']
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=text,
 
@@ -207,21 +207,23 @@ def change_ownership(client, message, bot_language, data) -> bool:
         return False
 
 
-def is_bot_admin(client, chat_id) -> bool:
-    """
-    checks if bot is admin in channel
-    --
-    returns `True` if bot is admin
-    """
-    chat_members = client.get_chat_members(chat_id)
-    # Iterate through the list of chat members
-    for member in chat_members:
-        if member.status == enums.ChatMemberStatus.ADMINISTRATOR and member.user.id == client.me.id:
+async def is_bot_admin(client:Client, chat_id):
+    try:
+        # Get information about the bot in the channel
+        chat_member = await client.get_chat_member(chat_id, "me")
+        
+        # Check if the bot is an admin in the channel
+        if chat_member.status == enums.ChatMemberStatus.ADMINISTRATOR:
             return True
-    else:
+        else:
+            return False
+        
+    except errors.UserNotParticipant:
+        # Bot is not a member of the channel
         return False
 
-def enable_refferal_messages(client,message,data,message_info=None) :
+
+async def enable_refferal_messages(client,message,data,message_info=None) :
     try:
         chat_id = message.chat.id
         if message_info:
@@ -231,7 +233,7 @@ def enable_refferal_messages(client,message,data,message_info=None) :
                 if button_title == button_title_requested:
                     data['refferal_messages'][button_data['id']] = message_info #{'chat_id':324525,'message_id':434553}
                     text = f' تم اضافة الرسالة الختامية للتصميم {button_title} '
-                    client.send_message(
+                    await client.send_message(
                     chat_id=chat_id,
                     text=text,
                     reply_markup=ReplyKeyboardRemove()
@@ -242,7 +244,7 @@ def enable_refferal_messages(client,message,data,message_info=None) :
         if message.text == 'None':
             data['refferal_messages'] = {}
             text = 'تم حذف جميع الرسائل بعد اكتمال الطلب'
-            client.send_message(
+            await client.send_message(
             chat_id=chat_id,
             text=text,
             )
@@ -256,7 +258,7 @@ def enable_refferal_messages(client,message,data,message_info=None) :
             markup.keyboard.append([KeyboardButton(text=button_data['title'])])
 
         markup.resize_keyboard = True
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=text,
             reply_markup=markup
@@ -270,7 +272,7 @@ def enable_refferal_messages(client,message,data,message_info=None) :
         logging.error(e)
         chat_id = message.chat.id
         text = 'حدث خطأ , تأكد من ارسال صحيح'
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=text,
             reply_markup=ReplyKeyboardRemove()
@@ -278,14 +280,15 @@ def enable_refferal_messages(client,message,data,message_info=None) :
         return 
 
 
-def enable_follow_me(client,message,data) -> bool:
+
+async def enable_follow_me(client,message,data,days:int) -> bool:
     try:
         chat_id = message.chat.id
         text = ' تمت اضافة رابط المتابعة بنجاح'
         if message.text == 'None':
             data['follow'] = None
             text = 'تم الغاء خدمة رابط المتابعة'
-            client.send_message(
+            await client.send_message(
             chat_id=chat_id,
             text=text,
             )
@@ -293,8 +296,11 @@ def enable_follow_me(client,message,data) -> bool:
         if not  message.text.startswith("http://") and not  message.text.startswith("https://"):
             raise ValueError("Invalid URL format")
         url = message.text
-        data['follow'] = url
-        client.send_message(
+        data['follow'] = {
+            'url':url,
+            'days':days #number of days before repeating the call
+        }
+        await client.send_message(
             chat_id=chat_id,
             text=text,
         )
@@ -302,13 +308,13 @@ def enable_follow_me(client,message,data) -> bool:
     except Exception as e:
         chat_id = message.chat.id
         text = 'حدث خطأ , تأكد من ارسال صحيح'
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=text,
         )
         return False
 
-def enable_must_sub(client, message, bot_language, data) -> bool:
+async def enable_must_sub(client, message, bot_language, data) -> bool:
     """
     activate must subscribe in tg channel to use bot
     --
@@ -321,7 +327,7 @@ def enable_must_sub(client, message, bot_language, data) -> bool:
         if message.text == 'None':
             data['sub'] = None
             text = bot_language['disable']['sub']
-            client.send_message(
+            await client.send_message(
                 chat_id=chat_id,
                 text=text,
             )
@@ -338,7 +344,7 @@ def enable_must_sub(client, message, bot_language, data) -> bool:
                 "username": username
             }
             text = bot_language['enable']['sub']
-            client.send_message(
+            await client.send_message(
                 chat_id=chat_id,
                 text=text,
             )
@@ -350,14 +356,14 @@ def enable_must_sub(client, message, bot_language, data) -> bool:
         chat_id = message.chat.id
         # print(e)
         text = bot_language['error']['sub']
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=text,
         )
         return False
 
 
-def enable_refferal_button(client,message,data,button_data=None) :
+async def enable_refferal_button(client,message,data,button_data=None) :
     try:
         chat_id = message.chat.id
         if button_data:
@@ -367,7 +373,7 @@ def enable_refferal_button(client,message,data,button_data=None) :
                 if message.text == 'None':
                     data['refferal_button'][selected] = None
                     text = f'تم الغاء تفعيل الرابط المضمن للرسالة  {selected} ✅'
-                    client.send_message(
+                    await client.send_message(
                     chat_id=chat_id,
                     text=text,
                     )
@@ -377,7 +383,7 @@ def enable_refferal_button(client,message,data,button_data=None) :
                 
                 url = message.text
                 text = f' ارسل عنوان الزر المضمن للرسالة {selected}'
-                client.send_message(
+                await client.send_message(
                     chat_id=chat_id,
                     text=text,
                     )
@@ -393,7 +399,7 @@ def enable_refferal_button(client,message,data,button_data=None) :
                     'url':url
                 }
                 text = f'تم اضافة الزر ( {title} ) الى الرسالة ({selected}) بنجاح ✅',
-                client.send_message(
+                await client.send_message(
                     chat_id=chat_id,
                     text=text,
                     reply_markup=ReplyKeyboardRemove()
@@ -401,10 +407,10 @@ def enable_refferal_button(client,message,data,button_data=None) :
                 return True
         #? 1 FIRST STEP : user selected which message
         if message.text:
-            if message.text == 'start' or message.text == 'end':
+            if message.text == 'start' or message.text == 'done':
                 selected_message = message.text
                 text = ' ارسل الرابط للزر المضمن \n\nيمكنك ارسال كلمة <code>None</code> لتعطيل الزر ',
-                client.send_message(
+                await client.send_message(
                     chat_id=chat_id,
                     text=text,
                     reply_markup=ReplyKeyboardRemove()
@@ -417,7 +423,7 @@ def enable_refferal_button(client,message,data,button_data=None) :
         logging.error(e)
         chat_id = message.chat.id
         text = 'حدث خطأ , تأكد من ارسال صحيح'
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=text,
             reply_markup=ReplyKeyboardRemove()
@@ -425,7 +431,7 @@ def enable_refferal_button(client,message,data,button_data=None) :
         return 
   
 
-def choose_text_holder_markup(client, message, message_holder, bot_language):
+async def choose_text_holder_markup(client, message, message_holder, bot_language):
     """
     prompt the user with the types of text messages he can change
     as reply markup
@@ -438,7 +444,7 @@ def choose_text_holder_markup(client, message, message_holder, bot_language):
             markup.keyboard.append([KeyboardButton(message_holder[holder])])
 
         text = bot_language['query']['text_select']
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=text,
             reply_markup=markup
@@ -448,14 +454,13 @@ def choose_text_holder_markup(client, message, message_holder, bot_language):
         chat_id = message.chat.id
         # print('enable_refferal_button', e)
         text = bot_language['error']['text']
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=text,
         )
         return None
 
-
-def change_text(client, message, new_text, message_holder, bot_language, data) -> bool:
+async def change_text(client, message, new_text, message_holder, bot_language, data) -> bool:
     """
     change text in data
     --
@@ -472,7 +477,7 @@ def change_text(client, message, new_text, message_holder, bot_language, data) -
         data['text'][holder_type] = new_text
         text = bot_language['done']['text'].format(
             setting=message_holder[holder_type], text=new_text)
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=text,
             reply_markup=ReplyKeyboardRemove()
@@ -482,7 +487,7 @@ def change_text(client, message, new_text, message_holder, bot_language, data) -
         chat_id = message.chat.id
         # print('enable_refferal_button', e)
         text = bot_language['error']['text']
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=text,
             reply_markup=ReplyKeyboardRemove()
@@ -650,26 +655,23 @@ def get_route_inline_markup(route_name, data, pressed_id=None):
         # print('tools.get_route_inline_markup', e)
         logging.error(e)
 
-
-def handle_nav_call(client, call, button, data):
-    params = get_message_params(call)
-    chat_id = params['chat_id']
-    message_id = params['message_id']
+async def handle_nav_call(client, chat_id,message_id, button, data):
     text = 'None'
     route = button['nav']
     text = data['routes'][route]['title']
     if 'edit' in route:
         text = text.format(title=button['title'])
     markup = get_route_inline_markup(route, data, button['id'])
-    client.edit_message_text(chat_id, message_id, text)
-    return client.edit_message_reply_markup(chat_id, message_id, reply_markup=markup)
+    await client.edit_message_text(chat_id, message_id, text)
+    return await client.edit_message_reply_markup(chat_id, message_id, reply_markup=markup)
 
 
-def ask_for_input(client, call, query_text, target_id=None):
+
+async def ask_for_input(client, call, query_text, target_id=None):
     try:
         chat_id = call.message.chat.id
-        client.delete_messages(chat_id, call.message.id)
-        query_msg = client.send_message(
+        await client.delete_messages(chat_id, call.message.id)
+        query_msg = await client.send_message(
             chat_id, query_text)
         return [query_msg, target_id]
     except Exception:
@@ -677,12 +679,11 @@ def ask_for_input(client, call, query_text, target_id=None):
         # print(e)
         logging.error(e)
 
-
-def set_new_target_title(client, message,target_type,  bot_language, target_id, data):
+async def set_new_target_title(client, message,target_type,  bot_language, target_id, data):
     try:
         if message.text == None or message.text == '':
             text = bot_language['error']['text']
-            client.send_message(
+            await client.send_message(
                 chat_id=chat_id,
                 text=text
             )
@@ -705,8 +706,8 @@ def set_new_target_title(client, message,target_type,  bot_language, target_id, 
                     text = f"تم تغيير العنوان من | {button_data['title']} | الى | {title} | ✅"
                     button_data['title'] = title
                     new_target_button = button_data
-                    client.delete_messages(chat_id, message.id)
-                    client.send_message(
+                    await client.delete_messages(chat_id, message.id)
+                    await client.send_message(
                         chat_id, text)
                     return True
         else:
@@ -716,9 +717,9 @@ def set_new_target_title(client, message,target_type,  bot_language, target_id, 
                 'toggle': None,
                 'nav': f'edit_{target_type}_page'
             }
-            client.delete_messages(chat_id, message.id)
+            await client.delete_messages(chat_id, message.id)
             text = bot_language['query'][f'{target_type}_file']
-            query_msg = client.send_message(
+            query_msg = await client.send_message(
                 chat_id, text)
             return [query_msg, new_target_button]
     except Exception:
@@ -728,14 +729,14 @@ def set_new_target_title(client, message,target_type,  bot_language, target_id, 
         params = get_message_params(message)
         chat_id = params['chat_id']
         text = bot_language['error']['text']
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=text
         )
         return False
 
 
-def set_target_file(client, message,target_type, target_data, folders, data) -> bool:
+async def set_target_file(client, message,target_type, target_data, folders, data) -> bool:
     """
     update a file for exsisting buttons and inserts new button if not exsists
     -
@@ -775,15 +776,15 @@ def set_target_file(client, message,target_type, target_data, folders, data) -> 
             else:
                 new_data = target_data
             wait = f'جار تنزيل الملف (<b>{new_data["title"]}</b>) ... '
-            client.delete_messages(chat_id, message.id)
-            wait_msg = client.send_message(
+            await client.delete_messages(chat_id, message.id)
+            wait_msg = await client.send_message(
                 chat_id, wait)
 
             file_name = new_data['id']
             file_path = folders[f'{target_type}s_folder_path'] + f"/{file_name}.{file_suffix}"
-            client.download_media(
+            await client.download_media(
                 message, file_path)
-            client.delete_messages(chat_id, wait_msg.id)
+            await client.delete_messages(chat_id, wait_msg.id)
             if type(target_data) == str:
                 for button_data in data['routes'][f'{target_type}s_page']['buttons'][:-2]:
                     if button_data['id'] == target_data:
@@ -796,7 +797,7 @@ def set_target_file(client, message,target_type, target_data, folders, data) -> 
                 
                 data[f'{target_type}s_settings'][new_data['id']] = default_settings
             text = f" تمت اضافة الملف  | <b>{new_data['title']}</b> |  بنجاح ✅"
-            client.send_message(
+            await client.send_message(
                 chat_id=chat_id,
                 text=text
             )
@@ -816,14 +817,14 @@ def set_target_file(client, message,target_type, target_data, folders, data) -> 
                     - كون حجم الملف اقل من 20 MB
                     - الملف بصيغة {allowed_types}
                     """
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=text
         )
         return False
 
 
-def handle_delete_target_call(client, call,target_type, data) -> bool:
+async def handle_delete_target_call(client, call,target_type, data) -> bool:
     params = get_message_params(call)
     chat_id = params['chat_id']
     message_id = params['message_id']
@@ -840,12 +841,12 @@ def handle_delete_target_call(client, call,target_type, data) -> bool:
                     if button_data['id'] in data['refferal_messages']:
                         del data['refferal_messages'][button_data['id']]
 
-                client.answer_callback_query(call.id, done, show_alert=True)
+                await client.answer_callback_query(call.id, done, show_alert=True)
                 text = data['routes'][f'{target_type}s_page']['title']
                 markup = get_route_inline_markup(f'{target_type}s_page', data)
-                client.edit_message_text(
+                await client.edit_message_text(
                     text=text, chat_id=chat_id, message_id=message_id)
-                client.edit_message_reply_markup(
+                await client.edit_message_reply_markup(
                     chat_id, message_id, reply_markup=markup)
                 return True
         return False
@@ -856,7 +857,7 @@ def handle_delete_target_call(client, call,target_type, data) -> bool:
         return False
 
 
-def handle_delete_all_call(client, call,target_type, folders, data):
+async def handle_delete_all_call(client, call,target_type, folders, data):
     """
     حذف جميع الملفات الموجودة في الداتابيس
 
@@ -871,12 +872,12 @@ def handle_delete_all_call(client, call,target_type, folders, data):
         data[f'{target_type}_settings'] = {}
         if target_type == 'design':
             data['refferal_messages'] = {}
-        client.answer_callback_query(call.id, done, show_alert=True)
+        await client.answer_callback_query(call.id, done, show_alert=True)
         text = data['routes'][f'{target_type}_page']['title']
         markup = get_route_inline_markup(f'{target_type}_page', data)
-        client.edit_message_text(
+        await client.edit_message_text(
             text=text, chat_id=chat_id, message_id=message_id)
-        client.edit_message_reply_markup(
+        await client.edit_message_reply_markup(
             chat_id, message_id, reply_markup=markup)
         return True
     except Exception:
@@ -884,7 +885,7 @@ def handle_delete_all_call(client, call,target_type, folders, data):
         logging.error(e)
         return False
 
-def show_target_settings(client, call, target_type, data):
+async def show_target_settings(client, call, target_type, data):
     """shows target settings"""
     params = get_message_params(call)
     chat_id = params['chat_id']
@@ -920,9 +921,9 @@ def show_target_settings(client, call, target_type, data):
                         [InlineKeyboardButton(f'~ ظبط حجم الخط   ~', callback_data=f"set {selected_id} {target_type[:-1]} size")],
                         [InlineKeyboardButton(f'« الرجوع الى اعدادات {title} ', callback_data=selected_id)]
                         ])
-                client.edit_message_text(
+                await client.edit_message_text(
                     text=text, chat_id=chat_id, message_id=message_id)
-                client.edit_message_reply_markup(
+                await client.edit_message_reply_markup(
                     chat_id, message_id, reply_markup=markup)
                 return True
         return False
@@ -932,7 +933,7 @@ def show_target_settings(client, call, target_type, data):
         logging.error(e)
         return False
 
-def set_target_setting(client, message, target_type,target_setting,target_id, bot_language,  data):
+async def set_target_setting(client, message, target_type,target_setting,target_id, bot_language,  data):
     try:
         params = get_message_params(message)
         chat_id = params['chat_id']
@@ -945,14 +946,14 @@ def set_target_setting(client, message, target_type,target_setting,target_id, bo
                 new_value = message.text
             data[f'{target_type}s_settings'][target_id][target_setting] = new_value
             text = f'تم ضبط الاعداد {target_setting} بنجاح !!'
-            client.send_message(
+            await client.send_message(
                 chat_id=chat_id,
                 text=text
             )
             return True
         else:
             text = bot_language['error'][target_setting]
-            client.send_message(
+            await client.send_message(
                 chat_id=chat_id,
                 text=text
             )
@@ -963,33 +964,32 @@ def set_target_setting(client, message, target_type,target_setting,target_id, bo
         params = get_message_params(message)
         chat_id = params['chat_id']
         text = bot_language['error'][target_setting]
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=text
         )
         return False
 
-def get_photo(client,message):
+async def get_photo(client,message):
     url = ''
     if message.photo:
-        url = f"https://api.telegram.org/bot{client.bot_token}/getFile?file_id={message.photo.file_id}"
+        url = f"https://api.telegram.org/bot{await client.bot_token}/getFile?file_id={message.photo.file_id}"
     elif message.document:
-        url = f"https://api.telegram.org/bot{client.bot_token}/getFile?file_id={message.document.file_id}"
+        url = f"https://api.telegram.org/bot{await client.bot_token}/getFile?file_id={message.document.file_id}"
     sleep(0.5)
     response = requests.get(url).json()
     file_path = response['result']['file_path']
     sleep(0.5)
     # Build the download URL
-    download_url = f'https://api.telegram.org/file/bot{client.bot_token}/{file_path}'
+    download_url = f'https://api.telegram.org/file/bot{await client.bot_token}/{file_path}'
     image_binary = requests.get(download_url).content
 
     return image_binary
 
-
-def is_user_subscribed(client, user_id, channel_id):
+async def is_user_subscribed(client, user_id, channel_id):
 
     try:
-        result = client.get_chat_member(channel_id, user_id)
+        result = await client.get_chat_member(channel_id, user_id)
         if result.status != enums.ChatMemberStatus.ADMINISTRATOR:
             if result.status != enums.ChatMemberStatus.MEMBER:
                 return False
@@ -999,8 +999,7 @@ def is_user_subscribed(client, user_id, channel_id):
         # print(e)
         return False
 
-
-def show_option_markup(client, chat_id,option, data):
+async def show_option_markup(client, chat_id,option, data):
     """
     respond with markup asking about selecting a ('design' or 'font')
     - 
@@ -1040,17 +1039,17 @@ def show_option_markup(client, chat_id,option, data):
                     row.append(buttons[second][0])
                 markup.inline_keyboard.append(row)
 
-            client.send_message(
+            await client.send_message(
                 chat_id, data['text'][f'select_{option}'], reply_markup=markup)
         else:
-            client.send_message(
+            await client.send_message(
                 chat_id, 'لا تتوفر خيارات حالياً, الرجاء إعادة المحاولة لاحقاً')
             return False
 
         return True
     except Exception:
         sleep(random.uniform(1, 2))
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=data['text']['error']
         )

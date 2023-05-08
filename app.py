@@ -48,15 +48,15 @@ limit_text ="""
 
 
 @bot.on_message(filters.private & filters.command(['start', 'help', 'set','follow','refferal_messages','button', 'designs', 'fonts', 'broadcast', 'text',
-                                                   'sub', 'dev', 'statistics', 'settings']))
-def send_text(client, message):
+                                                   'sub', 'dev', 'statistics', 'settings','text_messages']))
+async def send_text(client:Client, message:types.Message):
     try:
         params = tools.get_message_params(message)
         user_id = params["user_id"]
         chat_id = params["chat_id"]
         first_name = params["first_name"]
         user_url = f"<a href='tg://user?id={user_id}'> {first_name} </a>"
-        from_owner = tools.msg_from_owner(message, data['owner']['id'])
+        from_owner = await tools.msg_from_owner(message, data['owner']['id'])
         markup = None
         text = None
         if message.text == '/start':
@@ -72,9 +72,7 @@ def send_text(client, message):
                 markup = types.ReplyKeyboardRemove()
             elif message.text == '/settings':
                 text = bot_language['on_command']['settings']
-            elif message.text == '/statistics':
-                user_count = db.get_users_count()
-                must_sub = bot_language['enable']['sub'] if data['sub'] else bot_language['disable']['sub']
+            elif message.text == '/text_messages':
                 start_text = data['text']['start']
                 select_design_text = data['text']['select_design']
                 select_font_text = data['text']['select_font']
@@ -88,9 +86,7 @@ def send_text(client, message):
                     sub_text = sub_text.format(
                     channel_username='channel_username')
 
-                text = bot_language['on_command']['statistics'].format(
-                    user_count=user_count,
-                    must_sub=must_sub,
+                text = bot_language['on_command']['text_messages'].format(
                     start_text=start_text,
                     select_design_text=select_design_text,
                     select_font_text=select_font_text,
@@ -102,6 +98,24 @@ def send_text(client, message):
                     follow_sure_text=follow_sure_text,
 
                 )
+            elif message.text == '/statistics':
+                user_count = db.get_users_count()
+                must_sub = '✅ مفعل' if data['sub'] else 'معطل 🚫 '
+                follow = '✅ مفعل' if data['follow'] else 'معطل 🚫 '
+                follow_url = data['follow']['url'] if data['follow'] else 'لا يوجد'
+                follow_days = data['follow']['days'] if data['follow'] else 0
+                count_done = db.get_key('done')
+                waiting_count = db.get_list_count('wait')
+                text = bot_language['on_command']['statistics'].format(
+                    user_count=user_count,
+                    waiting_count=waiting_count,
+                    count_done=count_done,
+                    must_sub=must_sub,
+                    follow=follow,
+                    follow_url=follow_url,
+                    follow_days=follow_days,
+                )
+            
             elif message.text == '/set':
                 text = bot_language['query']['set']
                 db.set_user_state(chat_id, 'set', 60*4)
@@ -110,8 +124,8 @@ def send_text(client, message):
                 db.set_user_state(chat_id, 'sub', 60*4)
 
             elif message.text == '/follow':
-                text = bot_language['query']['follow']
-                db.set_user_state(chat_id, 'follow', 60*4)
+                text = bot_language['query']['follow_days']
+                db.set_user_state(chat_id, 'follow_days', 60*4)
             elif message.text == '/button':
                 text = bot_language['query']['refferal_button']
                 markup = types.ReplyKeyboardMarkup([
@@ -128,7 +142,7 @@ def send_text(client, message):
                         for button_data in data['routes']['designs_page']['buttons'][:-2]:
                             if button_data['id'] == item:
                                 text = text + '\n التصميم : ' + button_data['title'] 
-                    client.send_message(
+                    await client.send_message(
                     chat_id=chat_id,
                     text=text,
                     )
@@ -169,13 +183,13 @@ def send_text(client, message):
                 channel_id = data["sub"]["channel_id"]
                 channel_username = data["sub"]["username"]
                 channel_url = f'https://t.me/{channel_username}'
-                if tools.is_user_subscribed(client, chat_id, channel_id) == False:
+                if await tools.is_user_subscribed(client, chat_id, channel_id) == False:
                     text = data['text']['sub'].format(
                         channel_username=channel_username)
                     url_button = types.InlineKeyboardButton(
                         'إشتراك ⚠️', url=channel_url)
                     markup = types.InlineKeyboardMarkup([[url_button]])
-                    return client.send_message(chat_id, text, reply_markup=markup)
+                    return await client.send_message(chat_id, text, reply_markup=markup)
 
         if data['follow'] and from_owner == False:
             status = f'{chat_id}:status'
@@ -184,25 +198,27 @@ def send_text(client, message):
                 db.set_user_state(
                     chat_id, 'follow_sure', 40,status)
                 text = data['text']['follow']
-                url_button = types.InlineKeyboardButton('متابعة ⚠️', url=data['follow'])
+                url_button = types.InlineKeyboardButton('متابعة ⚠️', url=data['follow']['url'])
                 markup = types.InlineKeyboardMarkup([[url_button]])
-                return client.send_message(chat_id, text, reply_markup=markup)
+                return await  client.send_message(chat_id, text, reply_markup=markup)
             
             elif user_status == 'follow_sure':
                 text = data['text']['follow_sure']
+                num_days = data['follow']['days']
+                url = data['follow']['url']
                 db.set_user_state(
-                    chat_id, 'followed', (60*60) * 24,status)
-                url_button = types.InlineKeyboardButton('متابعة ⚠️', url=data['follow'])
+                    chat_id, 'followed', ((60*60) * 24) * num_days ,status)
+                url_button = types.InlineKeyboardButton(
+                    'متابعة ⚠️', url=url)
                 markup = types.InlineKeyboardMarkup([[url_button]])
-                return client.send_message(chat_id, text, reply_markup=markup)
-        
+                return await  client.send_message(chat_id, text, reply_markup=markup)
+            
         # ? sending the text
-        client.send_message(
+        await client.send_message(
             chat_id=chat_id,
             text=text,
             reply_markup=markup,
         )
-
 
         return
     except MessageDeleteForbidden as e:
@@ -223,7 +239,7 @@ def send_text(client, message):
 
 
 @bot.on_message(filters.private)
-def after_new_message(client, message):
+async def after_new_message(client, message):
     """
     get user state and follow up from there
     --
@@ -246,33 +262,37 @@ def after_new_message(client, message):
 
 ‏يرجى إرسال طلبك من جديد بعد {remaining_seconds} ثانية .
 """
-                return client.send_message(chat_id, text)
+                return await client.send_message(chat_id, text)
             
             if 'apply' in user_state  or 'requested_text' in user_state:
-                return client.send_message(chat_id, '⚠️ عذرًا عزيزي ..  \n [ عليك الانتظار قبل ارسال  طلب اخر ] 🤖\n\n اعد المحاولة لاحقاً')
+                return await client.send_message(chat_id, '⚠️ عذرًا عزيزي ..  \n [ عليك الانتظار قبل ارسال  طلب اخر ] 🤖\n\n اعد المحاولة لاحقاً')
             
-        from_owner = tools.msg_from_owner(message, data['owner']['id'])
+        from_owner = await tools.msg_from_owner(message, data['owner']['id'])
         if data['follow']:
             if user_status == None and from_owner == False:
                 db.set_user_state(
                         chat_id, 'follow_sure', 40,status)
                 text = data['text']['follow']
-                url_button = types.InlineKeyboardButton('متابعة ⚠️', url=data['follow'])
+                url_button = types.InlineKeyboardButton('متابعة ⚠️', url=data['follow']['url'])
                 markup = types.InlineKeyboardMarkup([[url_button]])
-                return client.send_message(chat_id, text, reply_markup=markup)
+                return await client.send_message(chat_id, text, reply_markup=markup)
         
         if data['follow'] and from_owner == False:
-            if user_status == 'follow_sure' or user_status == 'follow':
-                client.delete_messages(chat_id, message_id)
+            status = f'{chat_id}:status'
+            num_days = data['follow']['days']
+            url = data['follow']['url']
+            user_status = db.get_user_state(chat_id,status)
+            if not user_status or user_status == 'follow_sure' or user_status == 'follow' :
+                await client.delete_messages(chat_id, message_id)
                 text = data['text']['follow_sure']
                 db.set_user_state(
-                    chat_id, 'followed', (60*60) * 24,status)
+                    chat_id, 'followed', ((60*60) * 24) * num_days ,status)
                 url_button = types.InlineKeyboardButton(
-                    'متابعة ⚠️', url=data['follow'])
+                    'متابعة ⚠️', url=url)
                 markup = types.InlineKeyboardMarkup([[url_button]])
-                return client.send_message(chat_id, text, reply_markup=markup)
-   
-        if user_state == None or data['follow'] and user_status and 'followed' in user_status :
+                return await client.send_message(chat_id, text, reply_markup=markup)
+            
+        if user_state == None or user_status and 'followed' in user_status :
             if message.text and len(message.text) <= 30 :
                 if from_owner == False:
                     new_user = db.add_user_id(chat_id)   
@@ -280,19 +300,19 @@ def after_new_message(client, message):
                         channel_id = data["sub"]["channel_id"]
                         channel_username = data["sub"]["username"]
                         channel_url = f'https://t.me/{channel_username}'
-                        if tools.is_user_subscribed(client, chat_id, channel_id) == False:
-                            client.delete_messages(chat_id, message_id)
+                        if await tools.is_user_subscribed(client, chat_id, channel_id) == False:
+                            await client.delete_messages(chat_id, message_id)
                             text = data['text']['sub'].format(
                                 channel_username=channel_username)
                             url_button = types.InlineKeyboardButton(
                                 'إشتراك ⚠️', url=channel_url)
                             markup = types.InlineKeyboardMarkup([[url_button]])
-                            return client.send_message(chat_id, text, reply_markup=markup)
-
+                            return await client.send_message(chat_id, text, reply_markup=markup)
+                        
                     if len(threading.enumerate()) <= 30:
                         pass
                     else:
-                        client.send_message(
+                        await client.send_message(
                             chat_id, limit_text)
                         db.redis_store.delete('wait')
                         db.delete_user_state(channel_id)
@@ -308,36 +328,47 @@ def after_new_message(client, message):
 
                 requested_text = message.text
                 
-                if tools.show_option_markup(
+                if await tools.show_option_markup(
                     client, chat_id,'design', data):
                     db.set_user_state(
                         chat_id, f'requested_text::{requested_text}', 30)
                 return
 
             elif  message.text and len(message.text) > 30 :
-                client.send_message(chat_id, data['text']['error'])
+                await client.send_message(chat_id, data['text']['error'])
                 return 
         # ? owner only functionality
         if from_owner:
             global placeholder
             if user_state:
                 if user_state == 'set':
-                    if tools.change_ownership(client, message, bot_language, data):
+                    if await tools.change_ownership(client, message, bot_language, data):
                         setup.save_data(data, DATA_PATH)
                     db.delete_user_state(chat_id)
                     return
                 elif user_state == 'sub':
-                    if tools.enable_must_sub(client, message, bot_language, data):
+                    if await tools.enable_must_sub(client, message, bot_language, data):
                         setup.save_data(data, DATA_PATH)
                     db.delete_user_state(chat_id)
                     return
+                elif user_state == 'follow_days':
+                    if int(message.text) and int(message.text) > 0 :
+                        placeholder = [int(message.text)]
+                        text = bot_language['query']['follow']
+                        await client.send_message(chat_id,text)
+                        db.set_user_state(chat_id,'follow',60 * 3)
+                    else:
+                        await client.send_message(chat_id,'الرجاء ارسال رقم بعدد الايام')
+                        placeholder = None
+                        db.delete_user_state(chat_id)
+                    return
                 elif user_state == 'follow':
-                    if tools.enable_follow_me(client, message,  data):
+                    if await tools.enable_follow_me(client, message,  data,placeholder[0]):
                         setup.save_data(data, DATA_PATH)
                     db.delete_user_state(chat_id)
                     return
                 elif user_state == 'refferal_messages':
-                    placeholder = tools.enable_refferal_messages(client, message,  data)
+                    placeholder = await tools.enable_refferal_messages(client, message,  data)
                     if placeholder == True:
                         setup.save_data(data, DATA_PATH)
                         db.delete_user_state(chat_id)
@@ -346,19 +377,19 @@ def after_new_message(client, message):
                         db.set_user_state(chat_id, 'refferal_messages_place', 60*3)
                     return
                 elif user_state == 'refferal_messages_place':
-                    if tools.enable_refferal_messages(client, message,  data,message_info=placeholder):
+                    if await tools.enable_refferal_messages(client, message,  data,message_info=placeholder):
                         setup.save_data(data, DATA_PATH)
                     db.delete_user_state(chat_id)
                     return
                 
                 #? refferal button
                 elif user_state == 'refferal_button_link':
-                    placeholder = tools.enable_refferal_button(client, message,data)
+                    placeholder = await tools.enable_refferal_button(client, message,data)
                     if placeholder:
                         db.set_user_state(chat_id, 'refferal_button_title', 60*3)
                     return
                 elif user_state == 'refferal_button_title':
-                    placeholder = tools.enable_refferal_button(client, message, data, button_data=placeholder)
+                    placeholder = await tools.enable_refferal_button(client, message, data, button_data=placeholder)
                     if placeholder == True:
                         setup.save_data(data, DATA_PATH)
                         db.delete_user_state(chat_id)
@@ -367,27 +398,27 @@ def after_new_message(client, message):
                         db.set_user_state(chat_id, 'refferal_button_add', 60*3)
                     return
                 elif user_state == 'refferal_button_add':
-                    if tools.enable_refferal_button(client, message, data, button_data=placeholder):
+                    if await tools.enable_refferal_button(client, message, data, button_data=placeholder):
                         setup.save_data(data, DATA_PATH)
                     db.delete_user_state(chat_id)
                     placeholder = None
                     return
                 elif user_state == 'broadcast':
                     thread = threading.Thread(
-                        target=tools.broadcast, args=(client, message, bot_language))
+                        target=tools.broadcast, args=(bot, message, bot_language))
                     # Set the thread as a daemon thread
                     thread.setDaemon(True)
                     thread.start()  # start
                     db.delete_user_state(chat_id)
                     return
                 elif user_state == 'text':
-                    placeholder = tools.choose_text_holder_markup(
+                    placeholder = await tools.choose_text_holder_markup(
                         client, message, message_holder, bot_language)
                     if placeholder != None:
                         db.set_user_state(chat_id, 'text_select', 60*3)
                     return
                 elif user_state == 'text_select':
-                    if tools.change_text(client, message, placeholder, message_holder, bot_language, data):
+                    if await tools.change_text(client, message, placeholder, message_holder, bot_language, data):
                         setup.save_data(data, DATA_PATH)
                     db.delete_user_state(chat_id)
                     placeholder = None
@@ -395,7 +426,7 @@ def after_new_message(client, message):
                 elif '_title' in user_state:
                     target_type = user_state.split('_')[0]
                     bot.delete_messages(chat_id, placeholder[0].id)
-                    placeholder = tools.set_new_target_title(
+                    placeholder = await tools.set_new_target_title(
                         client, message,target_type, bot_language, placeholder[1], data)
                     if placeholder == True:
                         setup.save_data(data, DATA_PATH)
@@ -407,7 +438,7 @@ def after_new_message(client, message):
                 elif '_file' in user_state:
                     target_type = user_state.split('_')[0]
                     bot.delete_messages(chat_id, placeholder[0].id)
-                    if tools.set_target_file(client, message,target_type, placeholder[1], folders, data):
+                    if await tools.set_target_file(client, message,target_type, placeholder[1], folders, data):
                         setup.save_data(data, DATA_PATH)
                     placeholder = None
                     db.delete_user_state(chat_id)
@@ -419,11 +450,11 @@ def after_new_message(client, message):
                     target_setting = user_state.split()[-1]
                     bot.delete_messages(chat_id, placeholder[0].id) #deleting the ask message
                     if target_setting == 'location':
-                        photo = tools.get_photo(client,message)
+                        photo = await tools.get_photo(client,message)
                         location = Img(photo).get_point_location('#ff00ff')
                         data['designs_settings'][target_id]['location'] = location
                         text = f'تم ضبط الاعداد {target_setting} بنجاح !!'
-                        client.send_message(
+                        await client.send_message(
                             chat_id=chat_id,
                             text=text
                         )
@@ -432,7 +463,7 @@ def after_new_message(client, message):
                         setup.save_data(data, DATA_PATH)
                         return 
                     else:
-                        if tools.set_target_setting(
+                        if await tools.set_target_setting(
                             client, message,target_type,target_setting, target_id,bot_language, data):
                             setup.save_data(data, DATA_PATH)
                         placeholder = None
@@ -454,7 +485,7 @@ def after_new_message(client, message):
         return
 
 @bot.on_callback_query()
-def on_call(client, call):
+async def on_call(client, call):
 
     try:
         global placeholder
@@ -469,7 +500,7 @@ def on_call(client, call):
                     if user_state:
                         requested_text = user_state.split('::')[-1]
                         if user_state.split('::')[0] == 'requested_text':
-                            client.delete_messages(chat_id, message_id)
+                            await client.delete_messages(chat_id, message_id)
 
                             # tools.show_option_markup(client,chat_id,'font',data)
                             # db.set_user_state(
@@ -483,7 +514,7 @@ def on_call(client, call):
                            
                             # logging.error(len(threading.enumerate()))
                             threading.Thread(target=tools.respond_to_user,args=(bot,call,requested_text,option_id,data)).start()
-                            return client.answer_callback_query(call.id,'تم استقبال طلبك بنجاح',False)
+                            return await client.answer_callback_query(call.id,'تم استقبال طلبك بنجاح',False)
                             
                         # if user_state.split('::')[0] == 'apply':
                         #     design_id = user_state.split('::')[1]
@@ -493,8 +524,8 @@ def on_call(client, call):
                             
                     else:
                         try:
-                            client.delete_messages(call.message.chat.id, call.message.id)
-                            client.send_message(call.message.chat.id,'حاول مرة اخرى ')
+                            await client.delete_messages(call.message.chat.id, call.message.id)
+                            await client.send_message(call.message.chat.id,'حاول مرة اخرى ')
                             # client.answer_callback_query(call.id, bot_language['error']['on_call'],show_alert=True)
                             return
                         except FloodWait as e:
@@ -519,7 +550,7 @@ def on_call(client, call):
             target_setting = call.data.split()[-1]
             query = f'{target_type}_{target_setting}'
             if target_setting == 'location':
-                client.delete_messages(chat_id, call.message.id)
+                await client.delete_messages(chat_id, call.message.id)
                 file_path = None
                 for design_data in data['routes']['designs_page']['buttons'][:-2]:
                     if design_data['id'] == target_id:
@@ -530,7 +561,7 @@ def on_call(client, call):
                 sent = bot.send_document(chat_id,BytesIO(image_data),caption=bot_language['query'][query],file_name='IMAGE.PNG')
                 placeholder = [sent,target_id]
             else:
-                placeholder = tools.ask_for_input(
+                placeholder = await tools.ask_for_input(
                     client, call, bot_language['query'][query],target_id)
             
             db.set_user_state(chat_id, f'set {target_type} {target_setting}', 60*3)
@@ -541,12 +572,12 @@ def on_call(client, call):
             for button_data in data['routes'][route]['buttons']:
                 if callback_data == button_data['id']:
                     if button_data['nav'] != None:
-                        tools.handle_nav_call(client, call, button_data, data)
+                        await tools.handle_nav_call(client, call, button_data, data)
                     if button_data['toggle']:
 
                         if 'add_new_' in button_data['toggle']:
                             target_type = button_data['toggle'].split('_')[-1]
-                            placeholder = tools.ask_for_input(
+                            placeholder = await tools.ask_for_input(
                                 client, call, bot_language['query'][f'{target_type}_title'])
                             
                             db.set_user_state(chat_id, f'{target_type}_title', 60*3)
@@ -557,7 +588,7 @@ def on_call(client, call):
                             target_option = toggle_words[2] 
                             target_id = callback_data = call.data.split()[1]
                             
-                            placeholder = tools.ask_for_input(
+                            placeholder = await tools.ask_for_input(
                                 client, call, bot_language['query'][f'{target_type}_{target_option}'], target_id)
                             
                             db.set_user_state(chat_id, f'{target_type}_{target_option}', 60*3)
@@ -566,19 +597,19 @@ def on_call(client, call):
                         elif 'delete_all_' in button_data['toggle'] :
                             toggle_words = button_data['toggle'].split('_')
                             target_type = toggle_words[2] #* designs or fonts
-                            if tools.handle_delete_all_call(client, call, target_type ,folders, data):
+                            if await tools.handle_delete_all_call(client, call, target_type ,folders, data):
                                 return setup.save_data(data, DATA_PATH)
                             
                         elif '_settings' in button_data['toggle'] :
                             toggle_words = button_data['toggle'].split('_')
                             target_type = toggle_words[0] #* designs or fonts
-                            if tools.show_target_settings(client, call, target_type , data):
+                            if await tools.show_target_settings(client, call, target_type , data):
                                 return setup.save_data(data, DATA_PATH)
 
                         elif 'delete_' in button_data['toggle']:
                             toggle_words = button_data['toggle'].split('_')
                             target_type = toggle_words[1] #* design or font
-                            if tools.handle_delete_target_call(client, call,target_type, data):
+                            if await tools.handle_delete_target_call(client, call,target_type, data):
                                 return setup.save_data(data, DATA_PATH)
                             
                         
