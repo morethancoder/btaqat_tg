@@ -254,7 +254,7 @@ async def after_new_message(client, message):
         # print(user_state)
         if user_state:
             if user_state == 'user_rate_limit':
-                remaining_seconds = db.get_expire_time_in_seconds(chat_id)
+                remaining_seconds = db.get_expire_time_in_minutes(chat_id)
                 text = f"""
 ⚠️ عذرًا عزيزي .. 
 
