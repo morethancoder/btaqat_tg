@@ -10,9 +10,20 @@
     "follow": "\u26a0\ufe0f  \u0639\u0630\u0631\u0627\u064b \u0639\u0632\u064a\u0632\u064a \n\u2699  \u064a\u062c\u0628 \u0639\u0644\u064a\u0643 \u0645\u062a\u0627\u0628\u0639\u0629 \u062d\u0633\u0627\u0628\u064a \u0623\u0648\u0644\u0627\n\ud83d\udcee  \u062a\u0627\u0628\u0639 \u062b\u0645 \u0627\u0631\u0633\u0644 /start \u2b07\ufe0f\n        ",
     "follow_sure": "\u26a0\ufe0f  \u0639\u0630\u0631\u0627\u064b \u0639\u0632\u064a\u0632\u064a \n\u2699  \u0644\u0645 \u064a\u062a\u0645 \u062a\u0633\u062c\u064a\u0644\u0643 \u062a\u0623\u0643\u062f \u0645\u0646 \u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u062d\u0633\u0627\u0628 \u0623\u0648\u0644\u0627\n\ud83d\udcee  \u062a\u0627\u0628\u0639 \u062b\u0645 \u0627\u0631\u0633\u0644 /start \u2b07\ufe0f\n        "
   },
-  "designs_settings": {},
+  "designs_settings": {
+    "design_1": {
+      "location": {
+        "x": 555,
+        "y": 1779
+      },
+      "color": "1B4070"
+    }
+  },
   "fonts_settings": {
     "font_1": {
+      "size": 45
+    },
+    "font_2": {
       "size": 45
     }
   },
@@ -42,6 +53,12 @@
     "designs_page": {
       "title": "\n            <b>\u0627\u0644\u0635\u0641\u062d\u0629 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 \u0644\u0644\u062a\u0639\u062f\u064a\u0644 \u0639\u0644\u0649 \u0627\u0644\u062a\u0635\u0627\u0645\u064a\u0645</b>\n\n            - \u064a\u0645\u0643\u0646\u0643 \u0627\u0644\u062a\u0641\u0627\u0639\u0644 \u0628\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0627\u0644\u0627\u0632\u0631\u0627\u0631\n            ",
       "buttons": [
+        {
+          "id": "design_1",
+          "title": "\u062a\u0635\u0645\u064a\u0645 [ 1 ]",
+          "toggle": "./designs/design_1.png",
+          "nav": "edit_design_page"
+        },
         {
           "id": "0",
           "title": "+ \u0627\u0636\u0627\u0641\u0629 \u062a\u0635\u0645\u064a\u0645 +",
@@ -94,6 +111,12 @@
     "fonts_page": {
       "title": "\n            <b>\u0627\u0644\u0635\u0641\u062d\u0629 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 \u0644\u0644\u062a\u0639\u062f\u064a\u0644 \u0639\u0644\u0649 \u0627\u0644\u062e\u0637\u0648\u0637</b>\n\n            - \u064a\u0645\u0643\u0646\u0643 \u0627\u0644\u062a\u0641\u0627\u0639\u0644 \u0628\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0627\u0644\u0627\u0632\u0631\u0627\u0631\n            ",
       "buttons": [
+        {
+          "id": "font_2",
+          "title": "Emirates",
+          "toggle": "./fonts/font_2.ttf",
+          "nav": "edit_font_page"
+        },
         {
           "id": "font_1",
           "title": "CAIRO BOLD",

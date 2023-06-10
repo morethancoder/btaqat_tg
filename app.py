@@ -450,7 +450,7 @@ async def after_new_message(client, message):
                     target_setting = user_state.split()[-1]
                     bot.delete_messages(chat_id, placeholder[0].id) #deleting the ask message
                     if target_setting == 'location':
-                        photo = await tools.get_photo(client,message)
+                        photo = tools.get_photo(client,message)
                         location = Img(photo).get_point_location('#ff00ff')
                         data['designs_settings'][target_id]['location'] = location
                         text = f'تم ضبط الاعداد {target_setting} بنجاح !!'

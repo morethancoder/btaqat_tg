@@ -681,6 +681,8 @@ async def ask_for_input(client, call, query_text, target_id=None):
 
 async def set_new_target_title(client, message,target_type,  bot_language, target_id, data):
     try:
+        params = get_message_params(message)
+        chat_id = params['chat_id']
         if message.text == None or message.text == '':
             text = bot_language['error']['text']
             await client.send_message(
@@ -973,18 +975,18 @@ async def set_target_setting(client, message, target_type,target_setting,target_
         )
         return False
 
-async def get_photo(client,message):
+def get_photo(client,message):
     url = ''
     if message.photo:
-        url = f"https://api.telegram.org/bot{await client.bot_token}/getFile?file_id={message.photo.file_id}"
+        url = f"https://api.telegram.org/bot{client.bot_token}/getFile?file_id={message.photo.file_id}"
     elif message.document:
-        url = f"https://api.telegram.org/bot{await client.bot_token}/getFile?file_id={message.document.file_id}"
+        url = f"https://api.telegram.org/bot{client.bot_token}/getFile?file_id={message.document.file_id}"
     sleep(0.5)
     response = requests.get(url).json()
     file_path = response['result']['file_path']
     sleep(0.5)
     # Build the download URL
-    download_url = f'https://api.telegram.org/file/bot{await client.bot_token}/{file_path}'
+    download_url = f'https://api.telegram.org/file/bot{client.bot_token}/{file_path}'
     image_binary = requests.get(download_url).content
 
     return image_binary
@@ -1057,6 +1059,12 @@ async def show_option_markup(client, chat_id,option, data):
             text=data['text']['error']
         )
         return False
+    
+def is_arabic(text):
+    arabic_range = (0x0600 <= ord(char) <= 0x06FF or 0x0750 <= ord(char) <= 0x077F or 0x08A0 <= ord(char) <= 0x08FF
+                    or 0xFB50 <= ord(char) <= 0xFDFF or 0xFE70 <= ord(char) <= 0xFEFF or 0x10E60 <= ord(char) <= 0x10E7F
+                    for char in text)
+    return any(arabic_range)
 
 def respond_to_user(client,call,requested_text,design_id,data):
     """
@@ -1082,7 +1090,9 @@ def respond_to_user(client,call,requested_text,design_id,data):
             chat_id, data['text']['wait'])
     
         #? print text on trasnparent image
-        font_file_path = "./backup/font.ttf"
+        font_file_path = './fonts/font_2.ttf'
+        if is_arabic(requested_text):
+            font_file_path = "./backup/font.ttf"
         # font_file_path = folders['fonts_folder_path']+'/'+font_id+'.ttf'
         # font_setting = data['fonts_settings'][font_id]
         # size = font_setting['size']
