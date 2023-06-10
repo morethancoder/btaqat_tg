@@ -115,4 +115,8 @@ class Img:
 
 
 if __name__ == '__main__':
-    pass
+    with open('./designs/design_1.png' , 'rb') as f:
+        image = f.read()
+    image_data = Img(image).to_greyscale()
+    with open('./image.png','wb') as f :
+        f.write(image_data)

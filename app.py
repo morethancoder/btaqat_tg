@@ -309,7 +309,7 @@ async def after_new_message(client, message):
                             markup = types.InlineKeyboardMarkup([[url_button]])
                             return await client.send_message(chat_id, text, reply_markup=markup)
                         
-                    if len(threading.enumerate()) <= 30:
+                    if len(threading.enumerate()) <= 100:
                         pass
                     else:
                         await client.send_message(
@@ -485,7 +485,7 @@ async def after_new_message(client, message):
         return
 
 @bot.on_callback_query()
-async def on_call(client, call):
+async def on_call(client:Client, call):
 
     try:
         global placeholder
@@ -558,21 +558,21 @@ async def on_call(client, call):
                 with open(file_path , 'rb') as f:
                     image = f.read()
                 image_data = Img(image).to_greyscale()
-                sent = bot.send_document(chat_id,BytesIO(image_data),caption=bot_language['query'][query],file_name='IMAGE.PNG')
+                sent = await bot.send_document(chat_id,BytesIO(image_data),caption=bot_language['query'][query],file_name='IMAGE.PNG',force_document=True)
                 placeholder = [sent,target_id]
             else:
                 placeholder = await tools.ask_for_input(
                     client, call, bot_language['query'][query],target_id)
             
             db.set_user_state(chat_id, f'set {target_type} {target_setting}', 60*3)
-            return         
+            return       
         for route in data['routes']:
             if 'edit' in route:
                 callback_data = call.data.split()[0]
             for button_data in data['routes'][route]['buttons']:
                 if callback_data == button_data['id']:
                     if button_data['nav'] != None:
-                        await tools.handle_nav_call(client, call, button_data, data)
+                        await tools.handle_nav_call(client, chat_id, message_id, button_data, data)
                     if button_data['toggle']:
 
                         if 'add_new_' in button_data['toggle']:

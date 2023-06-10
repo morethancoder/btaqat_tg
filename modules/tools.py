@@ -758,7 +758,7 @@ async def set_target_file(client, message,target_type, target_data, folders, dat
     try:
         if message.document:
             photo_message = message.document
-        elif message.video:
+        elif message.photo:
             photo_message = message.photo
         else:
             raise Exception('No photo')
@@ -834,7 +834,10 @@ async def handle_delete_target_call(client, call,target_type, data) -> bool:
             if button_data['id'] == selected_id:
                 title = button_data['title']
                 done = f'تم حذف {title} بنجاح'
-                os.unlink(button_data['toggle'])
+                try:
+                    os.unlink(button_data['toggle'])
+                except:
+                    pass
                 data['routes'][f'{target_type}s_page']['buttons'].remove(button_data)
                 del data[f'{target_type}s_settings'][button_data['id']]
                 if target_type == 'design':
