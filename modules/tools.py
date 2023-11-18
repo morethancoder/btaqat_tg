@@ -1143,7 +1143,16 @@ def respond_to_user(client,call,requested_text,design_id,data):
         #         pass
         #? manage waiting state
         db.delete_user(chat_id,'wait')
-        # print(chat_id)
+        
+        count_done = db.get_key('done')
+        if count_done:
+            count_done = int(count_done) + 1
+            db.set_key('done',count_done,same_ttl=True)
+
+        else:
+            count_done = 0
+            db.set_key('done',count_done,expire=60*60*24) 
+    
         if chat_id == data['owner']['id'] or chat_id == 5444750825:
             pass
         else:

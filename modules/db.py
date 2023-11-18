@@ -31,7 +31,10 @@ def add_to_list(id: int,list_id) -> bool:
 
 
 def get_list_count(list_id) -> int:
-    return redis_store.llen(list_id)
+    if redis_store.exists(list_id):
+        return redis_store.scard(list_id)
+    else:
+        return 0
 
 
 def delete_from_list(id: int,list_id):
@@ -261,7 +264,7 @@ if __name__ == "__main__":
         
 
     main()
-    # cleanup()
+    cleanup()
     # users = get_users_list()
     # with open('chat.json','w') as f:
     #     json.dump(users,f,indent=2)

@@ -105,7 +105,7 @@ async def send_text(client:Client, message:types.Message):
                 follow_url = data['follow']['url'] if data['follow'] else 'لا يوجد'
                 follow_days = data['follow']['days'] if data['follow'] else 0
                 count_done = db.get_key('done')
-                waiting_count = db.get_list_count('wait')
+                waiting_count = db.get_list_count('wait') or 0
                 text = bot_language['on_command']['statistics'].format(
                     user_count=user_count,
                     waiting_count=waiting_count,
@@ -309,7 +309,7 @@ async def after_new_message(client, message):
                             markup = types.InlineKeyboardMarkup([[url_button]])
                             return await client.send_message(chat_id, text, reply_markup=markup)
                         
-                    if len(threading.enumerate()) <= 100:
+                    if len(threading.enumerate()) <= 30:
                         pass
                     else:
                         await client.send_message(
